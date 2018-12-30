@@ -2,10 +2,13 @@ package backend
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"testing"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -152,5 +155,26 @@ func Sign(t *testing.T) {
 	if resp.Data["token"] == "" {
 		t.Fatalf("expected \"token\" but received %q", resp.Data["token"])
 	}
-	t.Error(resp.Data["token"])
+
+	token, err := jwt.Parse(resp.Data["token"].(string), func(t *jwt.Token) (interface{}, error) {
+		req := &logical.Request{
+			Operation: logical.ReadOperation,
+			Path:      "key/" + t.Header["kid"].(string),
+			Storage:   testStorage,
+		}
+		resp, err := testBackend.HandleRequest(testCtx, req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			return nil, err
+		}
+
+		block, _ := pem.Decode([]byte(resp.Data["public"].(string)))
+
+		return x509.ParsePKIXPublicKey(block.Bytes)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !token.Valid {
+		t.Error("should be valid")
+	}
 }
