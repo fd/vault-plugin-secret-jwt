@@ -18,6 +18,9 @@ before_script:
     -v "$(go env GOPATH)/bin/vault-plugin-secret-jwt:/plugins/vault-plugin-secret-jwt" \
     -v "$(go env GOPATH)/src/github.com/fd/vault-plugin-secret-jwt/test/vault.hcl:/etc/vault.hcl" \
     vault:$VAULT_VERSION server -dev -dev-root-token-id="root" -config=/etc/vault.hcl
+- |
+  curl https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip > vault.zip
+  unzip -d /usr/bin vault.zip
 
 script:
 - go test -v ./...
