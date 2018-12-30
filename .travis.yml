@@ -1,5 +1,8 @@
 language: go
 
+services:
+- docker
+
 env:
 - VAULT_VERSION=1.0.1
 - VAULT_VERSION=0.11.6
@@ -7,5 +10,12 @@ env:
 go:
 - "1.11"
 go_import_path: github.com/fd/vault-plugin-secret-jwt
+
+before_script:
+- |
+  docker run -d \
+    -v "$(go env GOPATH)/bin/vault-plugin-secret-jwt:/plugins/vault-plugin-secret-jwt" \
+    -v "$(go env GOPATH)/src/github.com/fd/vault-plugin-secret-jwt/test/vault.hcl:/etc/vault.hcl" \
+    vault:$VAULT_VERSION server -dev -dev-root-token-id="root" -config=/etc/vault.hcl
 
 script: go test -v ./...
