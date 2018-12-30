@@ -20,7 +20,7 @@ before_script:
     vault:$VAULT_VERSION server -dev -dev-root-token-id="root" -config=/etc/vault.hcl
 - |
   curl https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip > vault.zip
-  unzip -d /usr/bin vault.zip
+  unzip -d "$(go env GOPATH)/bin" vault.zip
 
 script:
 - go test -v ./...
