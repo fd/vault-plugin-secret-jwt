@@ -27,8 +27,4 @@ script:
 
 - |
   export VAULT_TOKEN=root VAULT_ADDR=http://localhost:8200
-  SHASUM=$(sha256sum "$(go env GOPATH)/bin/vault-plugin-secret-jwt" | cut -d " " -f1)
-  vault plugin register \
-    -sha256=$SHASUM \
-    -command=vault-plugin-secret-jwt \
-    secret jwt
+  bash $(go env GOPATH)/src/github.com/fd/vault-plugin-secret-jwt/test/test_v${VAULT_VERSION}.sh
