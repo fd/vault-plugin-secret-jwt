@@ -6,11 +6,13 @@ services:
 env:
 - VAULT_VERSION=1.0.1
 - VAULT_VERSION=0.11.5
-- CGO_ENABLED=0
 
 go:
 - "1.11"
 go_import_path: github.com/fd/vault-plugin-secret-jwt
+
+before_install:
+- export CGO_ENABLED=0
 
 before_script:
 - |
