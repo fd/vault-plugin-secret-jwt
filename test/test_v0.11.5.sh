@@ -7,7 +7,7 @@ vault plugin register \
   -command=vault-plugin-secret-jwt \
   jwt
 
-vault secrets enable -plugin-name=jwt jwt
+vault secrets enable -plugin-name=jwt -path=jwt plugin
 
 vault write jwt/role/foo 'defaults={"foo":"bar", "baz":true}'
 vault read  jwt/role/foo
