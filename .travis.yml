@@ -13,7 +13,7 @@ go_import_path: github.com/fd/vault-plugin-secret-jwt
 
 install:
 - export CGO_ENABLED=0
-- go get -t -v .
+- go get -t -v ./...
 
 - |
   docker run -d \
