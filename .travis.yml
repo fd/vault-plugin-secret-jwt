@@ -26,6 +26,9 @@ before_install:
 
 - yarn
 
+install:
+- go get -t -v .
+
 script:
 - |
   export VAULT_TOKEN=root VAULT_ADDR=http://localhost:8200
