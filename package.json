@@ -1,6 +1,7 @@
 {
   "private": true,
   "devDependencies": {
+    "jsonwebtoken": "^8.4.0",
     "mocha": "^5.2.0",
     "node-fetch": "^2.3.0"
   }

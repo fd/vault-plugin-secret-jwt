@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken');
 
 describe('Roles', function() {
 
@@ -20,6 +21,53 @@ describe('Roles', function() {
       schema: '',
       ttl: 3600
     });
+  });
+
+  it('should accept none empty spec', async () => {
+    const id = randRoleName();
+
+
+    const resp1 = await write(`jwt/role/${id}`, {
+      defaults: JSON.stringify({
+        "aud": ["https://example.com"],
+      }),
+      overrides: JSON.stringify({
+        "iss": "https://example.net",
+      }),
+      schema: JSON.stringify({
+        properties: {
+          scopes: {
+            type: "array",
+            items: {
+              type: "string"
+            }
+          }
+        }
+      }),
+    });
+    assert.equal(resp1.status, 204);
+    assert.equal(resp1.body, null);
+
+    const resp2 = await read(`jwt/role/${id}`);
+    assert.equal(resp2.status, 200);
+    assert.deepEqual(resp2.body.data, {
+      defaults: "{\"aud\":[\"https://example.com\"]}",
+      name: "role1",
+      overrides: "{\"iss\":\"https://example.net\"}",
+      schema: "{\"properties\":{\"scopes\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}",
+      ttl: 3600
+    });
+
+    const resp3 = await write(`jwt/sign/${id}`, {
+      claims: JSON.stringify({
+        scopes: ["posts.write"]
+      }),
+    });
+    assert.equal(resp3.status, 200);
+    const claims = jwt.decode(resp3.body.data.token);
+    assert.deepEqual(claims.aud, ["https://example.com"]);
+    assert.deepEqual(claims.iss, "https://example.net");
+    assert.deepEqual(claims.scopes, ["posts.write"]);
   });
 
   it('should reject invalid defaults', async () => {
