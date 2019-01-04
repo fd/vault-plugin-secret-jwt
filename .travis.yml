@@ -11,10 +11,11 @@ go:
 - "1.11"
 go_import_path: github.com/fd/vault-plugin-secret-jwt
 
-before_install:
+install:
 - export CGO_ENABLED=0
 
 - |
+  mkdir -p "$(go env GOPATH)/bin"
   docker run -d \
     -p 8200:8200 \
     -v "$(go env GOPATH)/bin:/plugins" \
@@ -25,8 +26,6 @@ before_install:
   unzip -d "$(go env GOPATH)/bin" vault.zip
 
 - yarn
-
-install:
 - go get -t -v .
 
 script:
