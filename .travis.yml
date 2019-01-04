@@ -14,20 +14,23 @@ go_import_path: github.com/fd/vault-plugin-secret-jwt
 before_install:
 - export CGO_ENABLED=0
 
-before_script:
 - |
   docker run -d \
     -p 8200:8200 \
     -v "$(go env GOPATH)/bin/vault-plugin-secret-jwt:/plugins/vault-plugin-secret-jwt" \
-    -v "$(go env GOPATH)/src/github.com/fd/vault-plugin-secret-jwt/test/vault.hcl:/etc/vault.hcl" \
+    -v "${PWD}/test/vault.hcl:/etc/vault.hcl" \
     vault:$VAULT_VERSION server -dev -dev-root-token-id="root" -config=/etc/vault.hcl
 - |
   curl https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip > vault.zip
   unzip -d "$(go env GOPATH)/bin" vault.zip
 
-script:
-- go test -v ./...
+- yarn
 
+script:
 - |
   export VAULT_TOKEN=root VAULT_ADDR=http://localhost:8200
-  bash $(go env GOPATH)/src/github.com/fd/vault-plugin-secret-jwt/test/test_v${VAULT_VERSION}.sh
+  export PLUGIN_SHASUM=$(sha256sum "$(go env GOPATH)/bin/vault-plugin-secret-jwt" | cut -d " " -f1)
+  bash test/setup_v${VAULT_VERSION}.sh
+
+- go test -v ./...
+- ./node_modules/mocha/bin/mocha

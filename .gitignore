@@ -1,2 +1,6 @@
-/test/vault
+/dist
+/test/plugins
+/test/vault_*/*
+/test/vault_*.zip
+/node_modules
 .DS_Store

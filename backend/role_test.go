@@ -22,7 +22,7 @@ func TestRoleBuildClaims(t *testing.T) {
 
 		role.now = time.Date(2018, 12, 28, 10, 14, 00, 00, time.UTC)
 
-		claims, err := role.BuildClaims([]byte(extra), "foo", "bar")
+		claims, _, err := role.BuildClaims([]byte(extra), "xyz")
 
 		if toJSON(t, claims) != compactJSON(t, expected) {
 			t.Errorf("\nexpected: %s\nactual:   %s", compactJSON(t, expected), toJSON(t, claims))
@@ -50,10 +50,9 @@ func TestRoleBuildClaims(t *testing.T) {
 			"cap":["xx"],
 			"exp":1545995640,
 			"iat":1545992040,
-			"iss":"foo",
+			"jti":"xyz",
 			"nbf":1545991740,
-			"scopes":["https://example.com"],
-			"sub":"bar"
+			"scopes":["https://example.com"]
 		}`,
 		``,
 	)
@@ -64,9 +63,8 @@ func TestRoleBuildClaims(t *testing.T) {
 		`{
 			"exp":1545995640,
 			"iat":1545992040,
-			"iss":"foo",
-			"nbf":1545991740,
-			"sub":"bar"
+			"jti":"xyz",
+			"nbf":1545991740
 		}`,
 		``,
 	)
@@ -82,13 +80,12 @@ func TestRoleBuildClaims(t *testing.T) {
 			"nbf":3
 		}`,
 		`null`,
-		"6 errors occurred:\n"+
+		"5 errors occurred:\n"+
 			"	* /aud: \"aud\" cannot match schema\n"+
 			"	* /exp: \"exp\" cannot match schema\n"+
 			"	* /iat: \"iat\" cannot match schema\n"+
 			"	* /iss: \"iss\" cannot match schema\n"+
-			"	* /nbf: \"nbf\" cannot match schema\n"+
-			"	* /sub: \"sub\" cannot match schema\n",
+			"	* /nbf: \"nbf\" cannot match schema\n",
 	)
 
 	test(
@@ -105,12 +102,11 @@ func TestRoleBuildClaims(t *testing.T) {
 		},
 		``,
 		`null`,
-		"5 errors occurred:\n"+
+		"4 errors occurred:\n"+
 			"	* /exp: \"exp\" cannot match schema\n"+
 			"	* /iat: \"iat\" cannot match schema\n"+
 			"	* /iss: \"iss\" cannot match schema\n"+
-			"	* /nbf: \"nbf\" cannot match schema\n"+
-			"	* /sub: \"sub\" cannot match schema\n",
+			"	* /nbf: \"nbf\" cannot match schema\n",
 	)
 
 	test(
@@ -118,8 +114,8 @@ func TestRoleBuildClaims(t *testing.T) {
 			TTL: 3600,
 			Overrides: []byte(`{
 				"aud":["https://example.com"],
-				"iss":"baz",
-				"sub":"bax",
+				"iss":"https://example.com",
+				"sub":"https://example.com",
 				"iat":5,
 				"exp":8,
 				"nbf":3
@@ -127,12 +123,10 @@ func TestRoleBuildClaims(t *testing.T) {
 		},
 		``,
 		`null`,
-		"5 errors occurred:\n"+
+		"3 errors occurred:\n"+
 			"	* /exp: \"exp\" cannot match schema\n"+
 			"	* /iat: \"iat\" cannot match schema\n"+
-			"	* /iss: \"iss\" cannot match schema\n"+
-			"	* /nbf: \"nbf\" cannot match schema\n"+
-			"	* /sub: \"sub\" cannot match schema\n",
+			"	* /nbf: \"nbf\" cannot match schema\n",
 	)
 
 	test(
@@ -140,8 +134,8 @@ func TestRoleBuildClaims(t *testing.T) {
 			TTL: 3600,
 			Overrides: []byte(`{
 				"aud":true,
-				"iss":"baz",
-				"sub":"bax",
+				"iss":true,
+				"sub":true,
 				"iat":5,
 				"exp":8,
 				"nbf":3
@@ -153,9 +147,9 @@ func TestRoleBuildClaims(t *testing.T) {
 			"	* /aud: true did Not match any specified AnyOf schemas\n"+
 			"	* /exp: \"exp\" cannot match schema\n"+
 			"	* /iat: \"iat\" cannot match schema\n"+
-			"	* /iss: \"iss\" cannot match schema\n"+
+			"	* /iss: true did not match any of the specified OneOf schemas\n"+
 			"	* /nbf: \"nbf\" cannot match schema\n"+
-			"	* /sub: \"sub\" cannot match schema\n",
+			"	* /sub: true did not match any of the specified OneOf schemas\n",
 	)
 
 	test(
@@ -192,10 +186,9 @@ func TestRoleBuildClaims(t *testing.T) {
 		`{
 			"exp":1545995640,
 			"iat":1545992040,
-			"iss":"foo",
+			"jti":"xyz",
 			"nbf":1545991740,
-			"scopes":["https://example.com/scope-a"],
-			"sub":"bar"
+			"scopes":["https://example.com/scope-a"]
 		}`,
 		``,
 	)

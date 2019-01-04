@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"time"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
 
 type Key struct {
+	Expires   time.Time
 	PublicPEM []byte
 }
 

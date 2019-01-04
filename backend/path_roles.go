@@ -115,7 +115,7 @@ func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request
 
 	err = role.Validate()
 	if err != nil {
-		return nil, err
+		return errorResponse(err) // CodedError(400, err)
 	}
 
 	entry, err := logical.StorageEntryJSON(req.Path, role)
@@ -170,7 +170,7 @@ func (b *backend) pathRoleSign(ctx context.Context, req *logical.Request, data *
 
 	claims := []byte(data.Get("claims").(string))
 
-	jwtClaims, err := role.BuildClaims(claims, "", req.EntityID)
+	jwtClaims, expires, err := role.BuildClaims(claims, req.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,8 @@ func (b *backend) pathRoleSign(ctx context.Context, req *logical.Request, data *
 
 	return &logical.Response{
 		Data: map[string]interface{}{
-			"token": jwtToken,
+			"token":   jwtToken,
+			"expires": expires.Unix(),
 		},
 	}, nil
 }
