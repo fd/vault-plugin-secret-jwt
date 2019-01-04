@@ -72,10 +72,7 @@ func (c *currentKey) Get(ctx context.Context, req *logical.Request) (*PrivateKey
 		return nil, err
 	}
 
-	pubDer, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
+	pubDer := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 
 	prvDer, err := x509.MarshalPKCS8PrivateKey(rsaKey)
 	if err != nil {

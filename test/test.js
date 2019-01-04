@@ -21,6 +21,15 @@ describe('Roles', function() {
       schema: '',
       ttl: 3600
     });
+
+    const resp3 = await write(`jwt/sign/${id}`, {
+      claims: JSON.stringify({
+        scopes: ["posts.write"]
+      }),
+    });
+    assert.equal(resp3.status, 200);
+    const claims = await verifyJWT(resp3.body.data.token);
+    assert.deepEqual(claims.scopes, ["posts.write"]);
   });
 
   it('should accept none empty spec', async () => {
@@ -64,7 +73,7 @@ describe('Roles', function() {
       }),
     });
     assert.equal(resp3.status, 200);
-    const claims = jwt.decode(resp3.body.data.token);
+    const claims = await verifyJWT(resp3.body.data.token);
     assert.deepEqual(claims.aud, ["https://example.com"]);
     assert.deepEqual(claims.iss, "https://example.net");
     assert.deepEqual(claims.scopes, ["posts.write"]);
@@ -185,6 +194,37 @@ async function read(path) {
     status: res.status,
     body: resbody
   };
+}
+
+async function getKey(header) {
+  const res = await read(`jwt/key/${header.kid}`);
+  if (res.status != 200) {
+    throw new Error("unexpected status");
+  }
+  return res.body.data.public;
+}
+
+function verifyJWT(token) {
+  return new Promise((resolve, reject) => {
+    const getKeyCB = async (header, callback) => {
+      try {
+        callback(null, await getKey(header));
+      } catch (e) {
+        callback(e);
+      }
+    }
+
+    jwt.verify(token, getKeyCB, {
+      algorithms: ['RS256'],
+    }, function(err, decoded) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(decoded);
+      }
+    });
+  });
+
 }
 
 let roleCounter = 0;

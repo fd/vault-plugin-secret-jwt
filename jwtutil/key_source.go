@@ -82,7 +82,7 @@ func (ks *KeySource) lookupKey(keyID string) (interface{}, error) {
 	}
 
 	if block.Type == "PUBLIC KEY" || strings.HasSuffix(block.Type, " PUBLIC KEY") {
-		return x509.ParsePKIXPublicKey(block.Bytes)
+		return x509.ParsePKCS1PrivateKey(block.Bytes)
 	}
 
 	return nil, errors.New("invalid signing key")
