@@ -18,7 +18,7 @@ type Role struct {
 	now time.Time
 }
 
-var bareUserValidation = jsonschema.Must(`
+var bareUserSchema = jsonschema.Must(`
 {
 	"title": "Claims",
 	"type": "object",
@@ -39,7 +39,7 @@ var bareUserValidation = jsonschema.Must(`
 }
 `)
 
-var defaultsValidation = jsonschema.Must(`
+var defaultsSchema = jsonschema.Must(`
 {
 	"title": "Overrides",
 	"type": "object",
@@ -65,7 +65,7 @@ var defaultsValidation = jsonschema.Must(`
 }
 `)
 
-var overridesValidation = jsonschema.Must(`
+var overridesSchema = jsonschema.Must(`
 {
 	"title": "Overrides",
 	"type": "object",
@@ -133,7 +133,7 @@ func (r *Role) BuildClaims(claimsJSON []byte, jti string) (jwt.Claims, time.Time
 
 	// validate with basic schema
 	{
-		bareUserValidation.Validate("/", claims, &valErrs)
+		bareUserSchema.Validate("/", claims, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
@@ -146,7 +146,7 @@ func (r *Role) BuildClaims(claimsJSON []byte, jti string) (jwt.Claims, time.Time
 
 	// validate with basic schema
 	{
-		overridesValidation.Validate("/", overrides, &valErrs)
+		overridesSchema.Validate("/", overrides, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
@@ -159,7 +159,7 @@ func (r *Role) BuildClaims(claimsJSON []byte, jti string) (jwt.Claims, time.Time
 
 	// validate with basic schema
 	{
-		defaultsValidation.Validate("/", defaults, &valErrs)
+		defaultsSchema.Validate("/", defaults, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
@@ -192,9 +192,21 @@ func (r *Role) BuildClaims(claimsJSON []byte, jti string) (jwt.Claims, time.Time
 
 	// validate with role defined schema
 	if len(r.Schema) > 0 {
+		valErrs, err := metaSchema.ValidateBytes([]byte(r.Schema))
+		if err != nil {
+			result = multierror.Append(result, err)
+			return nil, expires, result
+		}
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
+			return nil, expires, result
+		}
+
 		var rs jsonschema.RootSchema
 
-		err := json.Unmarshal(r.Schema, &rs)
+		err = json.Unmarshal(r.Schema, &rs)
 		if err != nil {
 			result = multierror.Append(result, err)
 			return nil, expires, result
@@ -256,7 +268,7 @@ func (r *Role) Validate() error {
 
 	// validate with basic schema
 	{
-		overridesValidation.Validate("/", overrides, &valErrs)
+		overridesSchema.Validate("/", overrides, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
@@ -269,7 +281,7 @@ func (r *Role) Validate() error {
 
 	// validate with basic schema
 	{
-		defaultsValidation.Validate("/", defaults, &valErrs)
+		defaultsSchema.Validate("/", defaults, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
@@ -282,11 +294,15 @@ func (r *Role) Validate() error {
 
 	// validate with role defined schema
 	if len(r.Schema) > 0 {
-		var rs jsonschema.RootSchema
-
-		err := json.Unmarshal(r.Schema, &rs)
+		valErrs, err := metaSchema.ValidateBytes([]byte(r.Schema))
 		if err != nil {
 			result = multierror.Append(result, err)
+			return result
+		}
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
 			return result
 		}
 

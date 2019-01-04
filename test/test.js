@@ -63,6 +63,21 @@ describe('Roles', function() {
     });
   });
 
+  it('should reject invalid schema', async () => {
+    const resp = await write(`jwt/role/${randRoleName()}`, {
+      schema: JSON.stringify({
+        type: "xyz",
+      }),
+    });
+
+    assert.equal(resp.status, 400);
+    assert.deepEqual(resp.body, {
+      errors: [
+        "/type: \"xyz\" did Not match any specified AnyOf schemas",
+      ]
+    });
+  });
+
 });
 
 async function write(path, body) {
