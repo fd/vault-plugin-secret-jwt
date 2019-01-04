@@ -13,12 +13,12 @@ go_import_path: github.com/fd/vault-plugin-secret-jwt
 
 install:
 - export CGO_ENABLED=0
+- go get -t -v .
 
 - |
-  mkdir -p "$(go env GOPATH)/bin"
   docker run -d \
     -p 8200:8200 \
-    -v "$(go env GOPATH)/bin:/plugins" \
+    -v "$(go env GOPATH)/bin/vault-plugin-secret-jwt:/plugins/vault-plugin-secret-jwt" \
     -v "${PWD}/test/vault.hcl:/etc/vault.hcl" \
     vault:$VAULT_VERSION server -dev -dev-root-token-id="root" -config=/etc/vault.hcl
 - |
@@ -26,7 +26,6 @@ install:
   unzip -d "$(go env GOPATH)/bin" vault.zip
 
 - yarn
-- go get -t -v .
 
 script:
 - |
