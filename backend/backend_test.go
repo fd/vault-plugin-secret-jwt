@@ -172,7 +172,7 @@ func Sign(t *testing.T) {
 
 		block, _ := pem.Decode([]byte(resp.Data["public"].(string)))
 
-		return x509.ParsePKIXPublicKey(block.Bytes)
+		return x509.ParsePKCS1PublicKey(block.Bytes)
 	})
 	if err != nil {
 		t.Fatal(err)

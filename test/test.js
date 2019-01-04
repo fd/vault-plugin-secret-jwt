@@ -7,7 +7,6 @@ describe('Roles', function() {
   it('should accept empty spec', async () => {
     const id = randRoleName();
 
-
     const resp1 = await write(`jwt/role/${id}`, {});
     assert.equal(resp1.status, 204);
     assert.equal(resp1.body, null);
@@ -34,7 +33,6 @@ describe('Roles', function() {
 
   it('should accept none empty spec', async () => {
     const id = randRoleName();
-
 
     const resp1 = await write(`jwt/role/${id}`, {
       defaults: JSON.stringify({
