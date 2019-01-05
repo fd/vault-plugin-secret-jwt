@@ -2,10 +2,13 @@ package backend
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"testing"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -146,11 +149,35 @@ func Sign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(resp.Data) != 1 {
-		t.Fatalf("expected 1 items in %s but received %d", resp.Data, len(resp.Data))
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 items in %s but received %d", resp.Data, len(resp.Data))
 	}
-	if resp.Data["token"] == "" {
+	if resp.Data["token"] == nil {
 		t.Fatalf("expected \"token\" but received %q", resp.Data["token"])
 	}
-	t.Error(resp.Data["token"])
+	if resp.Data["expires"] == nil {
+		t.Fatalf("expected \"expires\" but received %d", resp.Data["expires"])
+	}
+
+	token, err := jwt.Parse(resp.Data["token"].(string), func(t *jwt.Token) (interface{}, error) {
+		req := &logical.Request{
+			Operation: logical.ReadOperation,
+			Path:      "key/" + t.Header["kid"].(string),
+			Storage:   testStorage,
+		}
+		resp, err := testBackend.HandleRequest(testCtx, req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			return nil, err
+		}
+
+		block, _ := pem.Decode([]byte(resp.Data["public"].(string)))
+
+		return x509.ParsePKCS1PublicKey(block.Bytes)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !token.Valid {
+		t.Error("should be valid")
+	}
 }

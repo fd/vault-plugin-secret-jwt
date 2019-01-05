@@ -18,31 +18,16 @@ type Role struct {
 	now time.Time
 }
 
-var bareUserValidation = jsonschema.Must(`
+var bareUserSchema = jsonschema.Must(`
 {
 	"title": "Claims",
 	"type": "object",
-	"propertyNames": {
-		"not": {
-			"enum": ["iss", "sub", "aud", "exp", "nbf", "iat", "iat"]
-		}
-	}
-}
-`)
-
-var bareStaticValidation = jsonschema.Must(`
-{
-	"title": "Overrides",
-	"type": "object",
 	"properties": {
-		"aud": { "anyOf": [
-			{ "$ref": "#/definitions/stringOrURI" },
-			{ "type": "array", "items": { "$ref": "#/definitions/stringOrURI" } }
-		] }
+		"sub": { "$ref": "#/definitions/stringOrURI" }
 	},
 	"propertyNames": {
 		"not": {
-			"enum": ["iss", "sub", "exp", "nbf", "iat", "iat"]
+			"enum": ["iss", "aud", "exp", "nbf", "iat", "jti"]
 		}
 	},
 	"definitions": {
@@ -54,7 +39,60 @@ var bareStaticValidation = jsonschema.Must(`
 }
 `)
 
-func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claims, error) {
+var defaultsSchema = jsonschema.Must(`
+{
+	"title": "Overrides",
+	"type": "object",
+	"properties": {
+		"aud": { "anyOf": [
+			{ "$ref": "#/definitions/stringOrURI" },
+			{ "type": "array", "items": { "$ref": "#/definitions/stringOrURI" } }
+		] },
+
+		"sub": { "$ref": "#/definitions/stringOrURI" }
+	},
+	"propertyNames": {
+		"not": {
+			"enum": [ "iss", "exp", "nbf", "iat", "jti"]
+		}
+	},
+	"definitions": {
+		"stringOrURI": { "oneOf": [
+			{ "type": "string", "pattern": "^[^:]*$" },
+			{ "type": "string", "format": "uri" }
+		] }
+	}
+}
+`)
+
+var overridesSchema = jsonschema.Must(`
+{
+	"title": "Overrides",
+	"type": "object",
+	"properties": {
+		"aud": { "anyOf": [
+			{ "$ref": "#/definitions/stringOrURI" },
+			{ "type": "array", "items": { "$ref": "#/definitions/stringOrURI" } }
+		] },
+
+		"iss": { "$ref": "#/definitions/stringOrURI" },
+		"sub": { "$ref": "#/definitions/stringOrURI" }
+	},
+	"propertyNames": {
+		"not": {
+			"enum": [ "exp", "nbf", "iat", "jti"]
+		}
+	},
+	"definitions": {
+		"stringOrURI": { "oneOf": [
+			{ "type": "string", "pattern": "^[^:]*$" },
+			{ "type": "string", "format": "uri" }
+		] }
+	}
+}
+`)
+
+func (r *Role) BuildClaims(claimsJSON []byte, jti string) (jwt.Claims, time.Time, error) {
 	var (
 		result        error
 		valErrs       []jsonschema.ValError
@@ -63,6 +101,7 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 		overrides     interface{}
 		defaultsJSON  = r.Defaults
 		defaults      interface{}
+		expires       time.Time
 	)
 
 	if len(claimsJSON) == 0 {
@@ -79,27 +118,27 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 
 	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
 		result = multierror.Append(result, err)
-		return nil, result
+		return nil, expires, result
 	}
 
 	if err := json.Unmarshal(overridesJSON, &overrides); err != nil {
 		result = multierror.Append(result, err)
-		return nil, result
+		return nil, expires, result
 	}
 
 	if err := json.Unmarshal(defaultsJSON, &defaults); err != nil {
 		result = multierror.Append(result, err)
-		return nil, result
+		return nil, expires, result
 	}
 
 	// validate with basic schema
 	{
-		bareUserValidation.Validate("/", claims, &valErrs)
+		bareUserSchema.Validate("/", claims, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
 		if result != nil {
-			return nil, result
+			return nil, expires, result
 		}
 
 		// valid
@@ -107,12 +146,12 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 
 	// validate with basic schema
 	{
-		bareStaticValidation.Validate("/", overrides, &valErrs)
+		overridesSchema.Validate("/", overrides, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
 		if result != nil {
-			return nil, result
+			return nil, expires, result
 		}
 
 		// valid
@@ -120,12 +159,12 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 
 	// validate with basic schema
 	{
-		bareStaticValidation.Validate("/", defaults, &valErrs)
+		defaultsSchema.Validate("/", defaults, &valErrs)
 		for _, err := range valErrs {
 			result = multierror.Append(result, err)
 		}
 		if result != nil {
-			return nil, result
+			return nil, expires, result
 		}
 
 		// valid
@@ -153,12 +192,24 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 
 	// validate with role defined schema
 	if len(r.Schema) > 0 {
-		var rs jsonschema.RootSchema
-
-		err := json.Unmarshal(r.Schema, &rs)
+		valErrs, err := metaSchema.ValidateBytes([]byte(r.Schema))
 		if err != nil {
 			result = multierror.Append(result, err)
-			return nil, result
+			return nil, expires, result
+		}
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
+			return nil, expires, result
+		}
+
+		var rs jsonschema.RootSchema
+
+		err = json.Unmarshal(r.Schema, &rs)
+		if err != nil {
+			result = multierror.Append(result, err)
+			return nil, expires, result
 		}
 
 		rs.Validate("/", claims, &valErrs)
@@ -166,7 +217,7 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 			result = multierror.Append(result, err)
 		}
 		if result != nil {
-			return nil, result
+			return nil, expires, result
 		}
 
 		// valid
@@ -176,17 +227,87 @@ func (r *Role) BuildClaims(claimsJSON []byte, issuer, subject string) (jwt.Claim
 	if !r.now.IsZero() {
 		now = r.now
 	}
+	expires = now.Add(time.Duration(r.TTL) * time.Second)
 	allClaims := jwt.MapClaims(claims.(map[string]interface{}))
 	allClaims["iat"] = now.Unix()
-	allClaims["exp"] = now.Add(time.Duration(r.TTL) * time.Second).Unix()
+	allClaims["exp"] = expires.Unix()
 	allClaims["nbf"] = now.Add(-5 * time.Minute).Unix()
-	allClaims["iss"] = issuer
-	allClaims["sub"] = subject
+	allClaims["jti"] = jti
 
-	return allClaims, nil
+	return allClaims, expires, nil
 }
 
-func (c *Role) Validate() error {
+func (r *Role) Validate() error {
+
+	var (
+		result        error
+		valErrs       []jsonschema.ValError
+		overridesJSON = r.Overrides
+		overrides     interface{}
+		defaultsJSON  = r.Defaults
+		defaults      interface{}
+	)
+
+	if len(overridesJSON) == 0 {
+		overridesJSON = []byte(`{}`)
+	}
+
+	if len(defaultsJSON) == 0 {
+		defaultsJSON = []byte(`{}`)
+	}
+
+	if err := json.Unmarshal(overridesJSON, &overrides); err != nil {
+		result = multierror.Append(result, err)
+		return result
+	}
+
+	if err := json.Unmarshal(defaultsJSON, &defaults); err != nil {
+		result = multierror.Append(result, err)
+		return result
+	}
+
+	// validate with basic schema
+	{
+		overridesSchema.Validate("/", overrides, &valErrs)
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
+			return result
+		}
+
+		// valid
+	}
+
+	// validate with basic schema
+	{
+		defaultsSchema.Validate("/", defaults, &valErrs)
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
+			return result
+		}
+
+		// valid
+	}
+
+	// validate with role defined schema
+	if len(r.Schema) > 0 {
+		valErrs, err := metaSchema.ValidateBytes([]byte(r.Schema))
+		if err != nil {
+			result = multierror.Append(result, err)
+			return result
+		}
+		for _, err := range valErrs {
+			result = multierror.Append(result, err)
+		}
+		if result != nil {
+			return result
+		}
+
+		// valid
+	}
 
 	return nil
 }

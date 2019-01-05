@@ -72,19 +72,17 @@ func (c *currentKey) Get(ctx context.Context, req *logical.Request) (*PrivateKey
 		return nil, err
 	}
 
-	pubDer, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
+	pubDer := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
 
 	prvDer, err := x509.MarshalPKCS8PrivateKey(rsaKey)
 	if err != nil {
 		return nil, err
 	}
 
+	now := time.Now()
 	key = &PrivateKey{
 		ID:      keyID,
-		Expires: time.Now().AddDate(0, 0, 1).UTC(),
+		Expires: now.AddDate(0, 0, 1).UTC(),
 		DER:     prvDer,
 
 		prvKey: rsaKey,
@@ -101,6 +99,7 @@ func (c *currentKey) Get(ctx context.Context, req *logical.Request) (*PrivateKey
 	}
 
 	entry, err = logical.StorageEntryJSON(path.Join("key", keyID), &Key{
+		Expires: now.AddDate(0, 0, 31).UTC(),
 		PublicPEM: pem.EncodeToMemory(&pem.Block{
 			Type:  "RSA PUBLIC KEY",
 			Bytes: pubDer,
