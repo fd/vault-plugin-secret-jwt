@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	uuid "github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/logical"
 )
 
@@ -41,6 +44,8 @@ func TestBackend(t *testing.T) {
 
 	// Plant a role for further testing.
 	t.Run("sign with role", Sign)
+
+	t.Run("expire keys", ExpireKeys)
 
 }
 
@@ -179,5 +184,68 @@ func Sign(t *testing.T) {
 	}
 	if !token.Valid {
 		t.Error("should be valid")
+	}
+}
+
+func ExpireKeys(t *testing.T) {
+	storage := &logical.InmemStorage{}
+	backend := &backend{}
+	ctx := context.Background()
+	req := &logical.Request{Storage: storage}
+
+	genUUID := func() string {
+		t.Helper()
+		id, err := uuid.GenerateUUID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	genKey := func() *rsa.PublicKey {
+		t.Helper()
+		rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &rsaKey.PublicKey
+	}
+
+	now := time.Date(2012, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	err := writePublicKey(ctx, req, genUUID(), genKey(), now.AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = writePublicKey(ctx, req, genUUID(), genKey(), now.AddDate(0, 0, -1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = writePublicKey(ctx, req, genUUID(), genKey(), now.AddDate(0, 0, -2))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err := storage.List(ctx, "key/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 3 {
+		t.Error("expected three keys")
+	}
+
+	err = backend.cleanExpiredPublicKeys(ctx, req, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err = storage.List(ctx, "key/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 {
+		t.Errorf("expected 1 key but got %d", len(keys))
 	}
 }

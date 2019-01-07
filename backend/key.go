@@ -72,8 +72,6 @@ func (c *currentKey) Get(ctx context.Context, req *logical.Request) (*PrivateKey
 		return nil, err
 	}
 
-	pubDer := x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)
-
 	prvDer, err := x509.MarshalPKCS8PrivateKey(rsaKey)
 	if err != nil {
 		return nil, err
@@ -93,18 +91,7 @@ func (c *currentKey) Get(ctx context.Context, req *logical.Request) (*PrivateKey
 		return nil, err
 	}
 
-	err = req.Storage.Put(ctx, entry)
-	if err != nil {
-		return nil, err
-	}
-
-	entry, err = logical.StorageEntryJSON(path.Join("key", keyID), &Key{
-		Expires: now.AddDate(0, 0, 31).UTC(),
-		PublicPEM: pem.EncodeToMemory(&pem.Block{
-			Type:  "RSA PUBLIC KEY",
-			Bytes: pubDer,
-		}),
-	})
+	err = writePublicKey(ctx, req, keyID, &rsaKey.PublicKey, now.AddDate(0, 0, 31))
 	if err != nil {
 		return nil, err
 	}
@@ -162,5 +149,31 @@ func (k *PrivateKey) decodePrivateKey() error {
 	}
 
 	k.prvKey = prvKey
+	return nil
+}
+
+func writePublicKey(
+	ctx context.Context, req *logical.Request,
+	keyID string, key *rsa.PublicKey, expires time.Time,
+) error {
+
+	entry, err := logical.StorageEntryJSON(
+		path.Join("key", keyID),
+		&Key{
+			Expires: expires.UTC(),
+			PublicPEM: pem.EncodeToMemory(&pem.Block{
+				Type:  "RSA PUBLIC KEY",
+				Bytes: x509.MarshalPKCS1PublicKey(key),
+			}),
+		})
+	if err != nil {
+		return err
+	}
+
+	err = req.Storage.Put(ctx, entry)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

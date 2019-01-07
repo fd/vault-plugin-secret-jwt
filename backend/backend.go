@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -30,8 +31,9 @@ func Backend(conf *logical.BackendConfig) *backend {
 			Unauthenticated: []string{"key/"},
 			SealWrapStorage: []string{"privatekey"},
 		},
-		Secrets:     []*framework.Secret{},
-		BackendType: logical.TypeLogical,
+		Secrets:      []*framework.Secret{},
+		BackendType:  logical.TypeLogical,
+		PeriodicFunc: b.periodic,
 	}
 
 	return &b
@@ -40,4 +42,8 @@ func Backend(conf *logical.BackendConfig) *backend {
 type backend struct {
 	*framework.Backend
 	currentKey
+}
+
+func (b *backend) periodic(ctx context.Context, req *logical.Request) error {
+	return b.cleanExpiredPublicKeys(ctx, req, time.Now())
 }
