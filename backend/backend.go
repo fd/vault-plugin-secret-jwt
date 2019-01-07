@@ -30,8 +30,9 @@ func Backend(conf *logical.BackendConfig) *backend {
 			Unauthenticated: []string{"key/"},
 			SealWrapStorage: []string{"privatekey"},
 		},
-		Secrets:     []*framework.Secret{},
-		BackendType: logical.TypeLogical,
+		Secrets:      []*framework.Secret{},
+		BackendType:  logical.TypeLogical,
+		PeriodicFunc: b.cleanExpiredPublicKeys,
 	}
 
 	return &b

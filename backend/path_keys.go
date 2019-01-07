@@ -76,3 +76,42 @@ func (b *backend) getKey(ctx context.Context, req *logical.Request, keyName stri
 
 	return key, nil
 }
+
+func (b *backend) cleanExpiredPublicKeys(ctx context.Context, req *logical.Request) error {
+	keys, err := req.Storage.List(ctx, "key/")
+	if err != nil {
+		return err
+	}
+
+	for _, keyID := range keys {
+		err := b.cleanExpiredPublicKey(ctx, req, keyID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *backend) cleanExpiredPublicKey(ctx context.Context, req *logical.Request, keyID string) error {
+	key, err := b.getKey(ctx, req, keyID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	expires := key.Expires
+	if !expires.IsZero() {
+		expires = expires.AddDate(0, 0, 7)
+	}
+	if !expires.IsZero() && now.Before(expires) {
+		return nil
+	}
+
+	err = req.Storage.Delete(ctx, path.Join("key", keyID))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
