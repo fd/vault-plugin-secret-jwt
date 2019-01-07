@@ -77,14 +77,14 @@ func (b *backend) getKey(ctx context.Context, req *logical.Request, keyName stri
 	return key, nil
 }
 
-func (b *backend) cleanExpiredPublicKeys(ctx context.Context, req *logical.Request) error {
+func (b *backend) cleanExpiredPublicKeys(ctx context.Context, req *logical.Request, now time.Time) error {
 	keys, err := req.Storage.List(ctx, "key/")
 	if err != nil {
 		return err
 	}
 
 	for _, keyID := range keys {
-		err := b.cleanExpiredPublicKey(ctx, req, keyID)
+		err := b.cleanExpiredPublicKey(ctx, req, now, keyID)
 		if err != nil {
 			return err
 		}
@@ -93,17 +93,13 @@ func (b *backend) cleanExpiredPublicKeys(ctx context.Context, req *logical.Reque
 	return nil
 }
 
-func (b *backend) cleanExpiredPublicKey(ctx context.Context, req *logical.Request, keyID string) error {
+func (b *backend) cleanExpiredPublicKey(ctx context.Context, req *logical.Request, now time.Time, keyID string) error {
 	key, err := b.getKey(ctx, req, keyID)
 	if err != nil {
 		return err
 	}
 
-	now := time.Now()
 	expires := key.Expires
-	if !expires.IsZero() {
-		expires = expires.AddDate(0, 0, 7)
-	}
 	if !expires.IsZero() && now.Before(expires) {
 		return nil
 	}
